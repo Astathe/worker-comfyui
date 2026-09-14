@@ -256,7 +256,6 @@ class WidgetToString:
 
     RETURN_TYPES = ("STRING",)
     RETURN_NAMES = ("STRING",)
-    OUTPUT_IS_LIST = (True,)
     FUNCTION = "get_widget_value"
     CATEGORY = "utils"
 
@@ -271,30 +270,30 @@ class WidgetToString:
         extra_pnginfo=None,
     ):
         if prompt is None:
-            return (["<prompt unavailable>"],)
+            return ("<prompt unavailable>",)
 
         # ``id`` is an int but prompt keys are strings
         node_data = prompt.get(str(id))
         if node_data is None:
-            return ([f"<node {id} not found>"],)
+            return (f"<node {id} not found>",)
 
         inputs = node_data.get("inputs", {})
 
         if return_all:
-            # Return every widget value as a comma-separated string
+            # Return every non-linked widget value joined by comma
             values = []
             for k, v in inputs.items():
                 if isinstance(v, list) and len(v) == 2 and isinstance(v[0], str):
                     # This is a linked input (node_id, slot) — skip it
                     continue
                 values.append(self._format(v, allowed_float_decimals))
-            return (values if values else [""],)
+            return (", ".join(values),)
 
         value = inputs.get(widget_name)
         if value is None:
-            return ([f"<widget '{widget_name}' not found in node {id}>"],)
+            return (f"<widget '{widget_name}' not found in node {id}>",)
 
-        return ([self._format(value, allowed_float_decimals)],)
+        return (self._format(value, allowed_float_decimals),)
 
     @staticmethod
     def _format(value, decimals):
