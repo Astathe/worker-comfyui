@@ -118,6 +118,7 @@ RUN chmod +x /usr/local/bin/comfy-manager-set-mode
 # Copy handler, workflow, and startup script
 WORKDIR /
 COPY handler.py /handler.py
+COPY src/network_volume.py /network_volume.py
 COPY src/start.sh /start.sh
 COPY ["Advanced_Gemma_V38 UMA.json", "/workflow.json"]
 COPY ["Advanced_Gemma_V38 UMA API.json", "/workflow_api.json"]
