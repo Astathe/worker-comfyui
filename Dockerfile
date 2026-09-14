@@ -35,10 +35,9 @@ SHELL ["/bin/bash", "-c"]
 # All models are downloaded in parallel to stay within the 30-minute build limit.
 # Each download is backgrounded (&); pids are collected and checked individually
 # so the build fails immediately if any single download exits non-zero.
-# ---------------------------------------------------------------------------
-# Batch 1 — Large models (checkpoint ~7 GB, ControlNet Union Pro ~4 GB,
-#            CLIP Vision ~4 GB, IP-Adapters, VAE, LoRA, SDXL ControlNets).
-# ---------------------------------------------------------------------------
+# Only models actually referenced by the workflow are downloaded here.
+# Unused models (SDXL ControlNets, IP-Adapters, CLIP Vision) have been
+# removed to keep the build well within RunPod's 30-minute limit.
 RUN set -euo pipefail; \
     pids=(); \
     \
@@ -54,102 +53,49 @@ RUN set -euo pipefail; \
         --relative-path models/controlnet \
         --filename "FLUX.1-dev-ControlNet-Union-Pro .safetensors" & pids+=($!); \
     \
-    # CLIP Vision (~4 GB total) \
-    comfy model download \
-        --url "https://huggingface.co/laion/CLIP-ViT-H-14-laion2B-s32B-b79K/resolve/main/model.safetensors?download=true" \
-        --relative-path models/clip_vision \
-        --filename CLIP-ViT-H-14-laion2B-s32B-b79K.safetensors & pids+=($!); \
-    comfy model download \
-        --url "https://huggingface.co/stabilityai/control-lora/resolve/main/revision/clip_vision_g.safetensors" \
-        --relative-path models/clip_vision \
-        --filename clip_vision_g.safetensors & pids+=($!); \
-    \
-    # IP-Adapter \
-    comfy model download \
-        --url "https://huggingface.co/h94/IP-Adapter/resolve/main/sdxl_models/ip-adapter-plus_sdxl_vit-h.safetensors" \
-        --relative-path models/ipadapter \
-        --filename ip-adapter-plus_sdxl_vit-h.safetensors & pids+=($!); \
-    comfy model download \
-        --url "https://huggingface.co/h94/IP-Adapter-FaceID/resolve/main/ip-adapter-faceid-plusv2_sdxl.bin" \
-        --relative-path models/ipadapter \
-        --filename ip-adapter-faceid-plusv2_sdxl.bin & pids+=($!); \
-    \
-    # VAE \
+    # VAE (~330 MB) \
     comfy model download \
         --url "https://huggingface.co/stabilityai/sdxl-vae/resolve/main/sdxl_vae.safetensors" \
         --relative-path models/vae/SDXL \
         --filename sdxl_vae.safetensors & pids+=($!); \
     \
-    # LoRA \
+    # LoRA (~150 MB) \
     comfy model download \
         --url "https://huggingface.co/Astathe/uma/resolve/main/UmaDiffusionXL_4th.safetensors?download=true" \
         --relative-path models/loras \
         --filename UmaDiffusionXL_4th.safetensors & pids+=($!); \
     \
-    # ControlNet (SDXL) \
-    comfy model download \
-        --url "https://huggingface.co/stabilityai/control-lora/resolve/main/control-LoRAs-rank256/control-lora-canny-rank256.safetensors" \
-        --relative-path models/controlnet/SDXL \
-        --filename control-lora-canny-rank256.safetensors & pids+=($!); \
-    comfy model download \
-        --url "https://huggingface.co/stabilityai/control-lora/resolve/main/control-LoRAs-rank256/control-lora-depth-rank256.safetensors" \
-        --relative-path models/controlnet/SDXL \
-        --filename control-lora-depth-rank256.safetensors & pids+=($!); \
-    comfy model download \
-        --url "https://huggingface.co/thibaud/controlnet-openpose-sdxl-1.0/resolve/main/OpenPoseXL2.safetensors" \
-        --relative-path models/controlnet/SDXL \
-        --filename OpenPoseXL2.safetensors & pids+=($!); \
-    comfy model download \
-        --url "https://huggingface.co/Acly/NoobAI-Inpainting/resolve/main/noobaiInpainting_v10.fp16.safetensors" \
-        --relative-path models/controlnet \
-        --filename noobaiInpainting_v10.fp16.safetensors & pids+=($!); \
-    \
-    # Wait for all downloads and propagate any failure \
-    failed=0; \
-    for pid in "${pids[@]}"; do \
-        wait "$pid" || failed=$?; \
-    done; \
-    exit $failed
-
-# ---------------------------------------------------------------------------
-# Batch 2 — Small models (upscale, SAM, Ultralytics detectors; all <200 MB).
-# ---------------------------------------------------------------------------
-RUN set -euo pipefail; \
-    pids=(); \
-    \
-    # Upscale Models \
+    # Upscale model (~64 MB) \
     comfy model download \
         --url "https://huggingface.co/FacehugmanIII/4x_foolhardy_Remacri/resolve/main/4x_foolhardy_Remacri.pth" \
         --relative-path models/upscale_models \
         --filename 4x_foolhardy_Remacri.pth & pids+=($!); \
     \
-    # SAM Models \
+    # SAM (~375 MB) \
     comfy model download \
         --url "https://dl.fbaipublicfiles.com/segment_anything/sam_vit_b_01ec64.pth" \
         --relative-path models/sams \
         --filename sam_vit_b_01ec64.pth & pids+=($!); \
     \
-    # Ultralytics (Bbox / Segm) \
-    comfy model download \
-        --url "https://huggingface.co/Bingsu/adetailer/resolve/main/hand_yolov9c.pt" \
-        --relative-path models/ultralytics/bbox \
-        --filename hand_yolov9c.pt & pids+=($!); \
+    # Ultralytics bbox detectors \
     comfy model download \
         --url "https://huggingface.co/Bingsu/adetailer/resolve/main/face_yolov9c.pt" \
         --relative-path models/ultralytics/bbox \
         --filename face_yolov9c.pt & pids+=($!); \
     comfy model download \
+        --url "https://huggingface.co/Bingsu/adetailer/resolve/main/hand_yolov9c.pt" \
+        --relative-path models/ultralytics/bbox \
+        --filename hand_yolov9c.pt & pids+=($!); \
+    comfy model download \
         --url "https://huggingface.co/GritTin/LoraStableDiffusion/resolve/c7766cc3c9b8b4f914932ce27f1cd48f25434636/Eyeful_v2-Paired.pt" \
         --relative-path models/ultralytics/bbox \
         --filename Eyeful_v2-Paired.pt & pids+=($!); \
+    \
+    # Ultralytics segm detector \
     comfy model download \
         --url "https://huggingface.co/adbrasi/wanlotest/resolve/main/ntd11_anime_nsfw_segm_v5-variant1.pt" \
         --relative-path models/ultralytics/segm \
         --filename ntd11_anime_nsfw_segm_v5-variant1.pt & pids+=($!); \
-    comfy model download \
-        --url "https://github.com/ultralytics/assets/releases/download/v8.3.0/yolo11m-seg.pt" \
-        --relative-path models/ultralytics/segm \
-        --filename yolo11m-seg.pt & pids+=($!); \
     \
     # Wait for all downloads and propagate any failure \
     failed=0; \
