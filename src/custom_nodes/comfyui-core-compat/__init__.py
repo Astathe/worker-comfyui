@@ -2,7 +2,7 @@
 Compatibility custom node pack providing core string and primitive nodes introduced
 in newer ComfyUI (v0.3.x+) for older base images.
 Includes: StringConcatenate, RegexReplace, PrimitiveBoolean, PrimitiveFloat, PrimitiveInt,
-PrimitiveString, StringCompare, StringContains, StringLength.
+PrimitiveString, StringCompare, StringContains, StringLength, WidgetToString.
 """
 
 import re
@@ -221,6 +221,88 @@ class StringLength:
         return (len(str(string)),)
 
 
+class WidgetToString:
+    """Reads a widget value from another node and returns it as a STRING.
+
+    Originally provided by comfyui-custom-scripts; this shim preserves
+    compatibility with workflows that reference the node.
+
+    The ``prompt`` hidden input contains the full workflow graph at execution
+    time, keyed by node id (string).  Each node entry has an ``inputs`` dict
+    whose keys are widget / input names.  We look up the requested node and
+    widget name, then format the value as a string.
+    """
+
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "id": ("INT", {"default": 0, "min": 0, "max": 0x7FFFFFFF}),
+                "widget_name": ("STRING", {"default": ""}),
+                "return_all": ("BOOLEAN", {"default": False}),
+            },
+            "optional": {
+                "node_title": ("STRING", {"default": ""}),
+                "allowed_float_decimals": (
+                    "INT",
+                    {"default": 2, "min": 0, "max": 10},
+                ),
+            },
+            "hidden": {
+                "prompt": "PROMPT",
+                "extra_pnginfo": "EXTRA_PNGINFO",
+            },
+        }
+
+    RETURN_TYPES = ("STRING",)
+    RETURN_NAMES = ("STRING",)
+    OUTPUT_IS_LIST = (True,)
+    FUNCTION = "get_widget_value"
+    CATEGORY = "utils"
+
+    def get_widget_value(
+        self,
+        id,
+        widget_name,
+        return_all=False,
+        node_title="",
+        allowed_float_decimals=2,
+        prompt=None,
+        extra_pnginfo=None,
+    ):
+        if prompt is None:
+            return (["<prompt unavailable>"],)
+
+        # ``id`` is an int but prompt keys are strings
+        node_data = prompt.get(str(id))
+        if node_data is None:
+            return ([f"<node {id} not found>"],)
+
+        inputs = node_data.get("inputs", {})
+
+        if return_all:
+            # Return every widget value as a comma-separated string
+            values = []
+            for k, v in inputs.items():
+                if isinstance(v, list) and len(v) == 2 and isinstance(v[0], str):
+                    # This is a linked input (node_id, slot) — skip it
+                    continue
+                values.append(self._format(v, allowed_float_decimals))
+            return (values if values else [""],)
+
+        value = inputs.get(widget_name)
+        if value is None:
+            return ([f"<widget '{widget_name}' not found in node {id}>"],)
+
+        return ([self._format(value, allowed_float_decimals)],)
+
+    @staticmethod
+    def _format(value, decimals):
+        if isinstance(value, float):
+            return f"{value:.{decimals}f}"
+        return str(value)
+
+
 NODE_CLASS_MAPPINGS = {
     "StringConcatenate": StringConcatenate,
     "RegexReplace": RegexReplace,
@@ -231,6 +313,7 @@ NODE_CLASS_MAPPINGS = {
     "StringCompare": StringCompare,
     "StringContains": StringContains,
     "StringLength": StringLength,
+    "WidgetToString": WidgetToString,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -243,6 +326,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "StringCompare": "String Compare",
     "StringContains": "String Contains",
     "StringLength": "String Length",
+    "WidgetToString": "Widget To String",
 }
 
 __all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS"]
