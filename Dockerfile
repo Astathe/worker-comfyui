@@ -31,69 +31,9 @@ RUN pip install "scipy<1.14"
 # =============================================================================
 # Download Models
 # =============================================================================
-# Switch to bash — required for array syntax (pids=(), pids+=($!)) used below.
-# /bin/sh (dash) is Docker's default and does not support bash arrays.
-SHELL ["/bin/bash", "-c"]
-
-# All models are downloaded in parallel using curl with retries.
-# Removed unused 6.6GB FLUX ControlNet to stay well within build time/size limits.
-RUN set -euo pipefail; \
-    mkdir -p /comfyui/models/checkpoints \
-             /comfyui/models/vae/SDXL \
-             /comfyui/models/loras \
-             /comfyui/models/upscale_models \
-             /comfyui/models/sams \
-             /comfyui/models/ultralytics/bbox \
-             /comfyui/models/ultralytics/segm; \
-    pids=(); \
-    \
-    # Checkpoint (~7 GB) \
-    curl -fL --retry 3 --retry-delay 2 -sS \
-        -o /comfyui/models/checkpoints/waiIllustriousSDXL_v170.safetensors \
-        "https://huggingface.co/LyliaEngine/waiIllustriousSDXL_v170/resolve/main/waiIllustriousSDXL_v170.safetensors" & pids+=($!); \
-    \
-    # VAE (~330 MB) \
-    curl -fL --retry 3 --retry-delay 2 -sS \
-        -o /comfyui/models/vae/SDXL/sdxl_vae.safetensors \
-        "https://huggingface.co/stabilityai/sdxl-vae/resolve/main/sdxl_vae.safetensors" & pids+=($!); \
-    \
-    # LoRA (~150 MB) \
-    curl -fL --retry 3 --retry-delay 2 -sS \
-        -o /comfyui/models/loras/UmaDiffusionXL_4th.safetensors \
-        "https://huggingface.co/Astathe/uma/resolve/main/UmaDiffusionXL_4th.safetensors" & pids+=($!); \
-    \
-    # Upscale model (~64 MB) \
-    curl -fL --retry 3 --retry-delay 2 -sS \
-        -o /comfyui/models/upscale_models/4x_foolhardy_Remacri.pth \
-        "https://huggingface.co/FacehugmanIII/4x_foolhardy_Remacri/resolve/main/4x_foolhardy_Remacri.pth" & pids+=($!); \
-    \
-    # SAM (~375 MB) \
-    curl -fL --retry 3 --retry-delay 2 -sS \
-        -o /comfyui/models/sams/sam_vit_b_01ec64.pth \
-        "https://dl.fbaipublicfiles.com/segment_anything/sam_vit_b_01ec64.pth" & pids+=($!); \
-    \
-    # Ultralytics bbox detectors \
-    curl -fL --retry 3 --retry-delay 2 -sS \
-        -o /comfyui/models/ultralytics/bbox/face_yolov9c.pt \
-        "https://huggingface.co/Bingsu/adetailer/resolve/main/face_yolov9c.pt" & pids+=($!); \
-    curl -fL --retry 3 --retry-delay 2 -sS \
-        -o /comfyui/models/ultralytics/bbox/hand_yolov9c.pt \
-        "https://huggingface.co/Bingsu/adetailer/resolve/main/hand_yolov9c.pt" & pids+=($!); \
-    curl -fL --retry 3 --retry-delay 2 -sS \
-        -o /comfyui/models/ultralytics/bbox/Eyeful_v2-Paired.pt \
-        "https://huggingface.co/GritTin/LoraStableDiffusion/resolve/c7766cc3c9b8b4f914932ce27f1cd48f25434636/Eyeful_v2-Paired.pt" & pids+=($!); \
-    \
-    # Ultralytics segm detector \
-    curl -fL --retry 3 --retry-delay 2 -sS \
-        -o /comfyui/models/ultralytics/segm/ntd11_anime_nsfw_segm_v5-variant1.pt \
-        "https://huggingface.co/adbrasi/wanlotest/resolve/main/ntd11_anime_nsfw_segm_v5-variant1.pt" & pids+=($!); \
-    \
-    # Wait for all downloads and propagate any failure \
-    failed=0; \
-    for pid in "${pids[@]}"; do \
-        wait "$pid" || failed=$?; \
-    done; \
-    exit $failed
+# Download all workflow models in parallel with retries and progress reporting
+COPY scripts/download_models.py /download_models.py
+RUN python3 /download_models.py && rm /download_models.py
 
 # =============================================================================
 # RunPod SDK and Custom Handler
