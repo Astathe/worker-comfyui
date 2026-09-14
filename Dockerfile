@@ -147,10 +147,14 @@ RUN set -euo pipefail; \
 COPY requirements.txt /requirements.txt
 RUN pip install -r /requirements.txt
 
+# Copy the comfy-manager-set-mode helper (called by start.sh at runtime)
+COPY scripts/comfy-manager-set-mode.sh /usr/local/bin/comfy-manager-set-mode
+RUN chmod +x /usr/local/bin/comfy-manager-set-mode
+
 # Copy handler, workflow, and startup script
 WORKDIR /
 COPY handler.py /handler.py
-COPY start.sh /start.sh
+COPY src/start.sh /start.sh
 COPY ["Advanced_Gemma_V38 UMA.json", "/workflow.json"]
 COPY ["Advanced_Gemma_V38 UMA API.json", "/workflow_api.json"]
 RUN chmod +x /start.sh
