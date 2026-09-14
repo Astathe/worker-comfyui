@@ -35,26 +35,56 @@ SHELL ["/bin/bash", "-c"]
 # All models are downloaded in parallel to stay within the 30-minute build limit.
 # Each download is backgrounded (&); pids are collected and checked individually
 # so the build fails immediately if any single download exits non-zero.
+# ---------------------------------------------------------------------------
+# Batch 1 — Large models (checkpoint ~7 GB, ControlNet Union Pro ~4 GB,
+#            CLIP Vision ~4 GB, IP-Adapters, VAE, LoRA, SDXL ControlNets).
+# ---------------------------------------------------------------------------
 RUN set -euo pipefail; \
     pids=(); \
     \
-    # Checkpoint \
+    # Checkpoint (~7 GB) \
     comfy model download \
         --url "https://huggingface.co/LyliaEngine/waiIllustriousSDXL_v170/resolve/main/waiIllustriousSDXL_v170.safetensors" \
         --relative-path models/checkpoints \
         --filename waiIllustriousSDXL_v170.safetensors & pids+=($!); \
     \
-    # LoRA \
+    # ControlNet — Union Pro (~4 GB, used by workflow ControlNetLoader node) \
     comfy model download \
-        --url "https://huggingface.co/Astathe/uma/resolve/main/UmaDiffusionXL_4th.safetensors?download=true" \
-        --relative-path models/loras \
-        --filename UmaDiffusionXL_4th.safetensors & pids+=($!); \
+        --url "https://huggingface.co/Shakker-Labs/FLUX.1-dev-ControlNet-Union-Pro/resolve/main/diffusion_pytorch_model.safetensors" \
+        --relative-path models/controlnet \
+        --filename "FLUX.1-dev-ControlNet-Union-Pro .safetensors" & pids+=($!); \
+    \
+    # CLIP Vision (~4 GB total) \
+    comfy model download \
+        --url "https://huggingface.co/laion/CLIP-ViT-H-14-laion2B-s32B-b79K/resolve/main/model.safetensors?download=true" \
+        --relative-path models/clip_vision \
+        --filename CLIP-ViT-H-14-laion2B-s32B-b79K.safetensors & pids+=($!); \
+    comfy model download \
+        --url "https://huggingface.co/stabilityai/control-lora/resolve/main/revision/clip_vision_g.safetensors" \
+        --relative-path models/clip_vision \
+        --filename clip_vision_g.safetensors & pids+=($!); \
+    \
+    # IP-Adapter \
+    comfy model download \
+        --url "https://huggingface.co/h94/IP-Adapter/resolve/main/sdxl_models/ip-adapter-plus_sdxl_vit-h.safetensors" \
+        --relative-path models/ipadapter \
+        --filename ip-adapter-plus_sdxl_vit-h.safetensors & pids+=($!); \
+    comfy model download \
+        --url "https://huggingface.co/h94/IP-Adapter-FaceID/resolve/main/ip-adapter-faceid-plusv2_sdxl.bin" \
+        --relative-path models/ipadapter \
+        --filename ip-adapter-faceid-plusv2_sdxl.bin & pids+=($!); \
     \
     # VAE \
     comfy model download \
         --url "https://huggingface.co/stabilityai/sdxl-vae/resolve/main/sdxl_vae.safetensors" \
         --relative-path models/vae/SDXL \
         --filename sdxl_vae.safetensors & pids+=($!); \
+    \
+    # LoRA \
+    comfy model download \
+        --url "https://huggingface.co/Astathe/uma/resolve/main/UmaDiffusionXL_4th.safetensors?download=true" \
+        --relative-path models/loras \
+        --filename UmaDiffusionXL_4th.safetensors & pids+=($!); \
     \
     # ControlNet (SDXL) \
     comfy model download \
@@ -73,31 +103,19 @@ RUN set -euo pipefail; \
         --url "https://huggingface.co/Acly/NoobAI-Inpainting/resolve/main/noobaiInpainting_v10.fp16.safetensors" \
         --relative-path models/controlnet \
         --filename noobaiInpainting_v10.fp16.safetensors & pids+=($!); \
-    # ControlNet — Union Pro (used by workflow ControlNetLoader node) \
-    comfy model download \
-        --url "https://huggingface.co/Shakker-Labs/FLUX.1-dev-ControlNet-Union-Pro/resolve/main/diffusion_pytorch_model.safetensors" \
-        --relative-path models/controlnet \
-        --filename "FLUX.1-dev-ControlNet-Union-Pro .safetensors" & pids+=($!); \
     \
-    # IP-Adapter \
-    comfy model download \
-        --url "https://huggingface.co/h94/IP-Adapter/resolve/main/sdxl_models/ip-adapter-plus_sdxl_vit-h.safetensors" \
-        --relative-path models/ipadapter \
-        --filename ip-adapter-plus_sdxl_vit-h.safetensors & pids+=($!); \
-    comfy model download \
-        --url "https://huggingface.co/h94/IP-Adapter-FaceID/resolve/main/ip-adapter-faceid-plusv2_sdxl.bin" \
-        --relative-path models/ipadapter \
-        --filename ip-adapter-faceid-plusv2_sdxl.bin & pids+=($!); \
-    \
-    # CLIP Vision \
-    comfy model download \
-        --url "https://huggingface.co/laion/CLIP-ViT-H-14-laion2B-s32B-b79K/resolve/main/model.safetensors?download=true" \
-        --relative-path models/clip_vision \
-        --filename CLIP-ViT-H-14-laion2B-s32B-b79K.safetensors & pids+=($!); \
-    comfy model download \
-        --url "https://huggingface.co/stabilityai/control-lora/resolve/main/revision/clip_vision_g.safetensors" \
-        --relative-path models/clip_vision \
-        --filename clip_vision_g.safetensors & pids+=($!); \
+    # Wait for all downloads and propagate any failure \
+    failed=0; \
+    for pid in "${pids[@]}"; do \
+        wait "$pid" || failed=$?; \
+    done; \
+    exit $failed
+
+# ---------------------------------------------------------------------------
+# Batch 2 — Small models (upscale, SAM, Ultralytics detectors; all <200 MB).
+# ---------------------------------------------------------------------------
+RUN set -euo pipefail; \
+    pids=(); \
     \
     # Upscale Models \
     comfy model download \
