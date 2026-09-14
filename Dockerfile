@@ -9,7 +9,6 @@ RUN comfy-node-install \
     https://github.com/Comfy-Org/ComfyUI-Manager \
     https://github.com/ltdrdata/ComfyUI-Impact-Pack \
     https://github.com/ltdrdata/ComfyUI-Impact-Subpack \
-    https://github.com/yolain/ComfyUI-Easy-Use \
     https://github.com/ssitu/ComfyUI_UltimateSDUpscale \
     https://github.com/rgthree/rgthree-comfy \
     https://github.com/alexopus/ComfyUI-Image-Saver \
