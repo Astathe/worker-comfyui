@@ -35,70 +35,58 @@ RUN pip install "scipy<1.14"
 # /bin/sh (dash) is Docker's default and does not support bash arrays.
 SHELL ["/bin/bash", "-c"]
 
-# All models are downloaded in parallel to stay within the 30-minute build limit.
-# Each download is backgrounded (&); pids are collected and checked individually
-# so the build fails immediately if any single download exits non-zero.
-# Only models actually referenced by the workflow are downloaded here.
-# Unused models (SDXL ControlNets, IP-Adapters, CLIP Vision) have been
-# removed to keep the build well within RunPod's 30-minute limit.
+# All models are downloaded in parallel using curl with retries.
+# Removed unused 6.6GB FLUX ControlNet to stay well within build time/size limits.
 RUN set -euo pipefail; \
+    mkdir -p /comfyui/models/checkpoints \
+             /comfyui/models/vae/SDXL \
+             /comfyui/models/loras \
+             /comfyui/models/upscale_models \
+             /comfyui/models/sams \
+             /comfyui/models/ultralytics/bbox \
+             /comfyui/models/ultralytics/segm; \
     pids=(); \
     \
     # Checkpoint (~7 GB) \
-    comfy model download \
-        --url "https://huggingface.co/LyliaEngine/waiIllustriousSDXL_v170/resolve/main/waiIllustriousSDXL_v170.safetensors" \
-        --relative-path models/checkpoints \
-        --filename waiIllustriousSDXL_v170.safetensors & pids+=($!); \
-    \
-    # ControlNet — Union Pro (~4 GB, used by workflow ControlNetLoader node) \
-    comfy model download \
-        --url "https://huggingface.co/Shakker-Labs/FLUX.1-dev-ControlNet-Union-Pro/resolve/main/diffusion_pytorch_model.safetensors" \
-        --relative-path models/controlnet \
-        --filename "FLUX.1-dev-ControlNet-Union-Pro .safetensors" & pids+=($!); \
+    curl -fL --retry 3 --retry-delay 2 -sS \
+        -o /comfyui/models/checkpoints/waiIllustriousSDXL_v170.safetensors \
+        "https://huggingface.co/LyliaEngine/waiIllustriousSDXL_v170/resolve/main/waiIllustriousSDXL_v170.safetensors" & pids+=($!); \
     \
     # VAE (~330 MB) \
-    comfy model download \
-        --url "https://huggingface.co/stabilityai/sdxl-vae/resolve/main/sdxl_vae.safetensors" \
-        --relative-path models/vae/SDXL \
-        --filename sdxl_vae.safetensors & pids+=($!); \
+    curl -fL --retry 3 --retry-delay 2 -sS \
+        -o /comfyui/models/vae/SDXL/sdxl_vae.safetensors \
+        "https://huggingface.co/stabilityai/sdxl-vae/resolve/main/sdxl_vae.safetensors" & pids+=($!); \
     \
     # LoRA (~150 MB) \
-    comfy model download \
-        --url "https://huggingface.co/Astathe/uma/resolve/main/UmaDiffusionXL_4th.safetensors?download=true" \
-        --relative-path models/loras \
-        --filename UmaDiffusionXL_4th.safetensors & pids+=($!); \
+    curl -fL --retry 3 --retry-delay 2 -sS \
+        -o /comfyui/models/loras/UmaDiffusionXL_4th.safetensors \
+        "https://huggingface.co/Astathe/uma/resolve/main/UmaDiffusionXL_4th.safetensors" & pids+=($!); \
     \
     # Upscale model (~64 MB) \
-    comfy model download \
-        --url "https://huggingface.co/FacehugmanIII/4x_foolhardy_Remacri/resolve/main/4x_foolhardy_Remacri.pth" \
-        --relative-path models/upscale_models \
-        --filename 4x_foolhardy_Remacri.pth & pids+=($!); \
+    curl -fL --retry 3 --retry-delay 2 -sS \
+        -o /comfyui/models/upscale_models/4x_foolhardy_Remacri.pth \
+        "https://huggingface.co/FacehugmanIII/4x_foolhardy_Remacri/resolve/main/4x_foolhardy_Remacri.pth" & pids+=($!); \
     \
     # SAM (~375 MB) \
-    comfy model download \
-        --url "https://dl.fbaipublicfiles.com/segment_anything/sam_vit_b_01ec64.pth" \
-        --relative-path models/sams \
-        --filename sam_vit_b_01ec64.pth & pids+=($!); \
+    curl -fL --retry 3 --retry-delay 2 -sS \
+        -o /comfyui/models/sams/sam_vit_b_01ec64.pth \
+        "https://dl.fbaipublicfiles.com/segment_anything/sam_vit_b_01ec64.pth" & pids+=($!); \
     \
     # Ultralytics bbox detectors \
-    comfy model download \
-        --url "https://huggingface.co/Bingsu/adetailer/resolve/main/face_yolov9c.pt" \
-        --relative-path models/ultralytics/bbox \
-        --filename face_yolov9c.pt & pids+=($!); \
-    comfy model download \
-        --url "https://huggingface.co/Bingsu/adetailer/resolve/main/hand_yolov9c.pt" \
-        --relative-path models/ultralytics/bbox \
-        --filename hand_yolov9c.pt & pids+=($!); \
-    comfy model download \
-        --url "https://huggingface.co/GritTin/LoraStableDiffusion/resolve/c7766cc3c9b8b4f914932ce27f1cd48f25434636/Eyeful_v2-Paired.pt" \
-        --relative-path models/ultralytics/bbox \
-        --filename Eyeful_v2-Paired.pt & pids+=($!); \
+    curl -fL --retry 3 --retry-delay 2 -sS \
+        -o /comfyui/models/ultralytics/bbox/face_yolov9c.pt \
+        "https://huggingface.co/Bingsu/adetailer/resolve/main/face_yolov9c.pt" & pids+=($!); \
+    curl -fL --retry 3 --retry-delay 2 -sS \
+        -o /comfyui/models/ultralytics/bbox/hand_yolov9c.pt \
+        "https://huggingface.co/Bingsu/adetailer/resolve/main/hand_yolov9c.pt" & pids+=($!); \
+    curl -fL --retry 3 --retry-delay 2 -sS \
+        -o /comfyui/models/ultralytics/bbox/Eyeful_v2-Paired.pt \
+        "https://huggingface.co/GritTin/LoraStableDiffusion/resolve/c7766cc3c9b8b4f914932ce27f1cd48f25434636/Eyeful_v2-Paired.pt" & pids+=($!); \
     \
     # Ultralytics segm detector \
-    comfy model download \
-        --url "https://huggingface.co/adbrasi/wanlotest/resolve/main/ntd11_anime_nsfw_segm_v5-variant1.pt" \
-        --relative-path models/ultralytics/segm \
-        --filename ntd11_anime_nsfw_segm_v5-variant1.pt & pids+=($!); \
+    curl -fL --retry 3 --retry-delay 2 -sS \
+        -o /comfyui/models/ultralytics/segm/ntd11_anime_nsfw_segm_v5-variant1.pt \
+        "https://huggingface.co/adbrasi/wanlotest/resolve/main/ntd11_anime_nsfw_segm_v5-variant1.pt" & pids+=($!); \
     \
     # Wait for all downloads and propagate any failure \
     failed=0; \
