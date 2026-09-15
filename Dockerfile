@@ -12,21 +12,10 @@ RUN comfy-node-install \
     https://github.com/ssitu/ComfyUI_UltimateSDUpscale \
     https://github.com/rgthree/rgthree-comfy \
     https://github.com/alexopus/ComfyUI-Image-Saver \
-    https://github.com/kijai/ComfyUI-KJNodes \
     https://github.com/willmiao/ComfyUI-Lora-Manager \
     https://github.com/pythongosssss/ComfyUI-Custom-Scripts \
-    https://github.com/Miosp/ComfyUI-FBCNN \
-    https://github.com/Fannovel16/comfyui_controlnet_aux \
-    https://github.com/cubiq/ComfyUI_IPAdapter_plus \
-    https://github.com/KohakuBlueleaf/z-tipo-extension \
-    https://github.com/pamparamm/ComfyUI-ppm \
-    https://github.com/1038lab/ComfyUI-QwenVL \
     https://github.com/mirabarukaso/ComfyUI_Mira \
     https://github.com/shadowcz007/comfyui-mixlab-nodes
-
-# comfyui_controlnet_aux pulls in scipy>=1.14 which requires NumPy>=2.0,
-# but the base image ships NumPy 1.26.4. Pin scipy to a compatible version.
-RUN pip install "scipy<1.14"
 
 # =============================================================================
 # Download Models
