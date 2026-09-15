@@ -402,7 +402,7 @@
           "scheduler": "normal",
           "denoise": [
             "18",
-            7
+            5
           ],
           "model": [
             "5",

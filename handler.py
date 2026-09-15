@@ -147,6 +147,50 @@ def _attempt_websocket_reconnect(ws_url, max_attempts, delay_s, initial_error):
     )
 
 
+def normalize_workflow(workflow):
+    """Normalize workflow for known custom node migrations.
+
+    Older ComfyUI-Image-Saver 'Input Parameters' nodes had 8 outputs with 'denoise' at slot 7.
+    The current release has 6 outputs with 'denoise' at slot 5.
+    """
+    if not isinstance(workflow, dict):
+        return workflow
+
+    # Find all Input Parameters (Image Saver) nodes
+    ip_nodes = set()
+    for node_id, node_data in workflow.items():
+        if (
+            isinstance(node_data, dict)
+            and node_data.get("class_type") == "Input Parameters (Image Saver)"
+        ):
+            ip_nodes.add(str(node_id))
+
+    if not ip_nodes:
+        return workflow
+
+    # Remap links pointing to [ip_node, 7] -> [ip_node, 5] (denoise)
+    for node_id, node_data in workflow.items():
+        if (
+            isinstance(node_data, dict)
+            and "inputs" in node_data
+            and isinstance(node_data["inputs"], dict)
+        ):
+            for input_name, input_val in node_data["inputs"].items():
+                if (
+                    isinstance(input_val, list)
+                    and len(input_val) == 2
+                    and str(input_val[0]) in ip_nodes
+                    and input_val[1] == 7
+                ):
+                    print(
+                        f"worker-comfyui - Normalizing link: node {node_id} input '{input_name}' "
+                        f"from [{input_val[0]}, 7] to [{input_val[0]}, 5] (Input Parameters denoise slot)"
+                    )
+                    input_val[1] = 5
+
+    return workflow
+
+
 def validate_input(job_input):
     """
     Validates the input for the handler function.
@@ -173,6 +217,9 @@ def validate_input(job_input):
     workflow = job_input.get("workflow")
     if workflow is None:
         return None, "Missing 'workflow' parameter"
+
+    # Normalize workflow for known custom node migrations
+    workflow = normalize_workflow(workflow)
 
     # Validate 'images' in input, if provided
     images = job_input.get("images")
