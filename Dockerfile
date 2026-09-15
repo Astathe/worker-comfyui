@@ -17,6 +17,10 @@ RUN comfy-node-install \
     https://github.com/mirabarukaso/ComfyUI_Mira \
     https://github.com/shadowcz007/comfyui-mixlab-nodes
 
+# ultralytics (from Impact-Pack) pulls in scipy>=1.14 which requires NumPy>=2.0,
+# but the base image ships NumPy 1.26.4. Pin scipy to a compatible version (<1.14).
+RUN pip install "scipy<1.14"
+
 # =============================================================================
 # Download Models
 # =============================================================================
